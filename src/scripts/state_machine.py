@@ -18,6 +18,7 @@ class StateMachine:
     SEARCHING = "searching"
     FLY_TO_SEARCH = "fly_to_search"
     DROP_OBJECT = "drop_drone"
+    FLYING_TO_END = "flying_to_end"
 
     def get_state(self):
         if self.startupMode:
