@@ -18,7 +18,6 @@ class StateMachine:
     SEARCHING = "searching"
     FLY_TO_SEARCH = "fly_to_search"
     DROP_OBJECT = "drop_object"
-    TEST_BRANCH = "test_branch"
 
     def get_state(self):
         if self.startupMode:
