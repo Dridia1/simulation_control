@@ -11,12 +11,13 @@
 # from std_msgs.msg import Float32
 
 
-class StateMachine():
+class StateMachine:
     startupMode = True
     START_UP = "start_up"
     FLYING_WITHOUT_DRONE = "flying_without_drone"
     SEARCHING = "searching"
     FLY_TO_SEARCH = "fly_to_search"
+    DROP_OBJECT = "drop_object"
 
     def get_state(self):
         if self.startupMode:
