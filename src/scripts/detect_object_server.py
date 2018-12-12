@@ -2,9 +2,7 @@
 import rospy
 import actionlib
 import simulation_control.msg
-'''Object detection for F651
-  Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
+
 from geometry_msgs.msg import PoseStamped, Point
 class detect_object_server():
     def __init__(self):

@@ -1,3 +1,35 @@
+'''Mavros for F651
+ 
+  Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
+ 
+  BSD license:
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the copyright holder nor the names of
+     contributors to this software may be used to endorse or promote
+     products derived from this software without specific prior written
+     permission.
+ 
+  THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS''
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+  PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT
+  HOLDER OR THE CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY
+  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ '''
+
 #!/usr/bin/env python
 
 import rospy
@@ -8,9 +40,8 @@ from mavros_msgs.srv import SetMode, SetModeRequest, SetModeResponse, CommandBoo
 import time
 from tf.transformations import *
 import numpy as np
-'''Mavros for F651
-   Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
+
+
 class mavros_state():
     def __init__(self):
         ### subscriber ###
@@ -23,7 +54,7 @@ class mavros_state():
         # wait until connection with FCU
         while not rospy.is_shutdown() and not self.current_state.connected:
             rospy.Rate(20)
-        print 'FCU connection successful'
+        print('FCU connection successful')
 
     #callback function for state
     def current_state_callback(self, data):
@@ -34,10 +65,10 @@ class mavros_state():
     #'OFFBOARD'
     def set_mode(self, mode):
         if not self.current_state.connected:
-            print "No FCU connection"
+            print("No FCU connection")
 
         elif self.current_state.mode == mode:
-            print "Already in " + mode + " mode"
+            print("Already in " + mode + " mode")
 
         else:
 
@@ -62,19 +93,19 @@ class mavros_state():
                         # request
                         set_mode.call(req)
 
-                    except rospy.ServiceException, e:
-                        print "Service did not process request: %s" % str(e)
+                    except rospy.ServiceException as e:
+                        print("Service did not process request: %s" % str(e))
 
                     t0 = rospy.get_time()
 
-            print "Mode: " + self.current_state.mode + " established"
+            print("Mode: " + self.current_state.mode + " established")
 
 
     #Arm the vehicle
     def arm(self, do_arming):
 
         if self.current_state.armed and do_arming:
-            print "already armed"
+            print("already armed")
 
         else:
             # wait for service
@@ -99,12 +130,12 @@ class mavros_state():
                             # request
                             set_arm.call(req)
 
-                        except rospy.ServiceException, e:
-                            print "Service did not process request: %s" % str(e)
+                        except rospy.ServiceException as e:
+                            print("Service did not process request: %s" % str(e))
 
                         t0 = rospy.get_time()
 
-                print "armed: ", self.current_state.armed
+                print("armed: ", self.current_state.armed)
 
             else:
                 while not rospy.is_shutdown() and self.current_state.armed:
@@ -114,8 +145,8 @@ class mavros_state():
                             # request
                             set_arm.call(req)
 
-                        except rospy.ServiceException, e:
-                            print "Service did not process request: %s" % str(e)
+                        except rospy.ServiceException as e:
+                            print("Service did not process request: %s" % str(e))
 
                         t0 = rospy.get_time()
 
@@ -123,7 +154,7 @@ class mavros_state():
 
         if not self.current_state.armed:
 
-            print "not armed yet"
+            print("not armed yet")
 
         else:
 
@@ -152,18 +183,18 @@ class mavros_state():
                         # request
                         set_rq.call(req)
 
-                    except rospy.ServiceException, e:
-                        print "Service did not process request: %s" % str(e)
+                    except rospy.ServiceException as e:
+                        print("Service did not process request: %s" % str(e))
 
                     t0 = rospy.get_time()
 
-            print "landed savely"
+            print("landed savely")
 
     def takeoff(self):
 
         if not self.current_state.armed:
 
-            print "not armed yet"
+            print("not armed yet")
 
         else:
 
@@ -192,9 +223,9 @@ class mavros_state():
                         # request
                         set_rq.call(req)
 
-                    except rospy.ServiceException, e:
-                        print "Service did not process request: %s" % str(e)
+                    except rospy.ServiceException as e:
+                        print("Service did not process request: %s" % str(e))
 
                     t0 = rospy.get_time()
 
-            print "landed savely"
+            print("landed savely")

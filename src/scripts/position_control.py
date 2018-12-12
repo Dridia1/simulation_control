@@ -6,13 +6,9 @@ from std_msgs.msg import Float32, Bool, String
 from VelocityController import VelocityController
 import numpy as np
 
-'''Position control for F651
-   Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
-
 class position_control():
     def __init__(self):
-        print 'Initialising position control'
+        print('Initialising position control')
         rospy.init_node('position_control', anonymous=True)
         rate = rospy.Rate(20)
 
@@ -53,7 +49,7 @@ class position_control():
         self.vController.set_y_pid(2.8, 0.913921, 0.0, 0.15)#2.1, 0.713921, 0.350178
         self.vController.set_z_pid(1.3, 2.4893, 0.102084, 0.1)
 
-        print 'Init done'
+        print('Init done')
         while not rospy.is_shutdown():
             if self.current_mode.data == 'posctr':
                 self._pose_pub.publish(self._pose_msg)
@@ -62,7 +58,7 @@ class position_control():
                 self.des_vel = self.vController.update(self.local_pose)
                 self._vel_pub.publish(self.des_vel)
             else:
-                print "No such position mode"
+                print("No such position mode")
             self.check_distance()
             rate.sleep()
 

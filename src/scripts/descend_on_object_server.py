@@ -4,9 +4,6 @@ import actionlib
 import simulation_control.msg
 from geometry_msgs.msg import PoseStamped, Point
 from std_msgs.msg import Bool, String
-'''Object Descend for F651
-   Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
 
 class descend_on_object_server():
     def __init__(self):

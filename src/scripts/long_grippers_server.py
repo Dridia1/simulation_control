@@ -6,9 +6,6 @@ import actionlib
 import simulation_control.msg
 import time
 
-'''Long Grippers for F651
-   Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
 from std_msgs.msg import Float32
 
 class long_grippers_server():

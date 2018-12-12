@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # Python libs
 import sys, time
-'''Color Detection for F651
-   Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
+
 # numpy and scipy
 import numpy as np
 from scipy.ndimage import filters
@@ -22,7 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 # We do not use cv_bridge it does not support CompressedImage in python
 # from cv_bridge import CvBridge, CvBridgeError
 
-VERBOSE=False
+VERBOSE = False
 
 class image_feature:
 
@@ -39,14 +37,14 @@ class image_feature:
         # subscribed Topic
         self.subscriber = rospy.Subscriber("/uav_camera/image_raw_down", Image, self.callback,  queue_size=1)
         if VERBOSE :
-            print "subscribed to /uav_camera/image_raw_down"
+            print("subscribed to /uav_camera/image_raw_down")
 
 
     def callback(self, ros_data):
         '''Callback function of subscribed topic.
         Here images get converted and features detected'''
         if VERBOSE :
-            print 'received image of type: "%s"' % ros_data.format
+            print('received image of type: "%s"' % ros_data.format)
 
         ###Set boundarys###
         lower_range = np.array([0, 255, 255], dtype=np.uint8) #The object color is 255,153,0
@@ -126,7 +124,7 @@ def main(args):
     try:
         rospy.spin()
     except KeyboardInterrupt:
-        print "Shutting down ROS Image color detector module"
+        print("Shutting down ROS Image color detector module")
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':

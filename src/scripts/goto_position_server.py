@@ -3,10 +3,8 @@ import rospy
 import actionlib
 import simulation_control.msg
 from std_msgs.msg import Bool, String
+
 from geometry_msgs.msg import PoseStamped
-'''Goto Position for F651
-  Copyright (C) 2018, CPS2018 Challenge by Team Halmstad. All rights reserved.
- '''
 class goto_position_server():
     def __init__(self):
 
