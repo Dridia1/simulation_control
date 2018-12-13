@@ -1,25 +1,81 @@
 #!/usr/bin/env python
 
 import roslib
-roslib.load_manifest('simulation_control')
 import rospy
 import actionlib
 import mavros_state
 import time
-
-from state_machine import StateMachine
-
-from simulation_control.msg import center_on_objectAction,  center_on_objectGoal, descend_on_objectAction, descend_on_objectGoal, detect_objectAction, detect_objectGoal, goto_positionAction, goto_positionGoal, short_grippersAction, short_grippersGoal, long_grippersAction, long_grippersGoal
-
+from simulation_control.msg import descend_on_objectAction, descend_on_objectGoal, detect_objectAction, detect_objectGoal, goto_positionAction, goto_positionGoal, short_grippersAction, short_grippersGoal, long_grippersAction, long_grippersGoal
 from std_msgs.msg import Float32
+from State import State
+from StateMachine import StateMachine
+# found below "import roslib"
+roslib.load_manifest('simulation_control')
 
-# mv_state = None
-# goto_position_client = None
-# goto_position_goal = None
+# Possible inputs: Object.Lost, Object.Found, Destination.Reached
 
 
-def init_takeoff():
-    print("asd")
+class TakeOff(State):
+
+    takeoff = False
+
+    def do_action(self):
+        print("TOstate: Start")
+        goto_position_goal.destination.pose.position.z = 5
+        goto_position_client.send_goal(goto_position_goal)
+        # Will return True or False
+        self.takeoff = goto_position_client.wait_for_result()
+        print("TOState succ: " + str(self.takeoff))
+        # Close long grippers to pickup position
+        move_long_grippers(0.5000000000)
+        print("TOState: moved long gripp. Done")
+
+    def next_state(self):
+        # if state_input == "":
+            # return "Fly To Search pos"
+        if self.takeoff:
+            Drone.Flying.pos = [-105, 0, 3]
+            return Drone.Flying
+        else:
+            return Drone.TakeOff
+
+
+class Flying(State):
+
+    pos = [0, 0, 0]
+
+    def do_action(self):
+        print("Fstate: Flying to " + str(self.pos[0]) + ", " + str(self.pos[1]) + ", " + str(self.pos[2]))
+        fly_to_pos(self.pos[0], self.pos[1], self.pos[2])
+
+    def next_state(self):
+        return Drone.Searching
+
+
+class Searching(State):
+    def do_action(self):
+        print("Searching")
+        detect_object_client.send_goal(detect_object_goal)
+        detect_object_client.wait_for_result()
+        print(detect_object_client.get_result())
+
+    def next_state(self):
+        #if state_input == "":
+            # return ""
+        return Drone.TakeOff
+
+
+class Drone(StateMachine):
+    def __init__(self):
+        # Starting state
+        StateMachine.__init__(self, Drone.TakeOff)
+
+
+# Initialize the variables for the StateMachine
+Drone.TakeOff = TakeOff()
+Drone.Searching = Searching()
+Drone.Flying = Flying()
+drone_done = False
 
 
 def move_long_grippers(pos):
@@ -54,46 +110,43 @@ def fly_to_pos(x, y, z):
 
 if __name__ == '__main__':
     # Initialize variables and Take off
-    state = StateMachine()
     rospy.init_node('action_controller')
     rospy.loginfo('Setting offboard')
     mv_state = mavros_state.mavros_state()
     mv_state.set_mode('OFFBOARD')
     rospy.loginfo('Arming vehicle')
     mv_state.arm(True)
-    rospy.loginfo("Taking off")
     goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
-    # Will return True or False
     goto_position_client.wait_for_server()
     goto_position_goal = goto_positionGoal()
-    goto_position_goal.destination.pose.position.z = 5
-    goto_position_client.send_goal(goto_position_goal)
-    # Will return True or False
-    s = goto_position_client.wait_for_result()
-    if s:
-        state.startupMode = False
-    rospy.loginfo("Takeoff succeded: " + str(StateMachine.startupMode))
-    # End of Initializing
-
-    if state.get_state() == state.FLY_TO_SEARCH:
-        print("Fly to search position")
-    elif state.get_state() == state.SEARCHING:
-        print("Searching")
 
     # Init Long Grippers
     long_grippers_client = actionlib.SimpleActionClient('long_grippers', long_grippersAction)
     long_grippers_client.wait_for_server()
 
-    # Close long grippers to pickup position
-    move_long_grippers(0.5000000000)
+    # Init Detect Object
+    detect_object_client = actionlib.SimpleActionClient('detect_object', detect_objectAction)
+    detect_object_client.wait_for_server()
+    detect_object_goal = detect_objectGoal()
+
+    # End of Initializing
+
+    rospy.loginfo("Taking off")
+    # goto_position_goal.destination.pose.position.z = 5
+    # goto_position_client.send_goal(goto_position_goal)
+    # Will return True or False
+    # s = goto_position_client.wait_for_result()
+    d = Drone()
+    d.start()  # This will perform the TakeOff action.
+    # while not drone_done:
+        # d.do_next_state()
+    
+    rospy.loginfo("Takeoff succeeded: ")
 
     fly_to_pos(-105, 0, 3)
     rospy.loginfo("Arrived at search position.")
 
     rospy.loginfo("Searching...")
-    detect_object_client = actionlib.SimpleActionClient('detect_object', detect_objectAction)
-    detect_object_client.wait_for_server()
-    detect_object_goal = detect_objectGoal()
     detect_object_client.send_goal(detect_object_goal)
     detect_object_client.wait_for_result()
     print(detect_object_client.get_result())
@@ -118,7 +171,7 @@ if __name__ == '__main__':
         print("landing")
         mv_state.arm(False)
     else:
-        rospy.loginfo("Couldnt land exiting")
+        rospy.loginfo("Couldnt land, exiting")
     time.sleep(3)
 
     # Init Short grippers
