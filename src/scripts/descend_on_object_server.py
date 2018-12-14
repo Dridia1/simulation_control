@@ -88,6 +88,11 @@ class descend_on_object_server():
                 self.vel_control.publish(self.des_pose)
                 while not self.target_reached:
                     rospy.sleep(2)
+            elif not self.detected:
+                self.rate.sleep()
+                self.result.position_reached.data = False
+                self.action_server.set_succeeded(self.result)
+
 
         print("Landing")
         self.vel_control.publish(self.des_pose)
