@@ -33,7 +33,8 @@
 import rospy
 
 class PID:
-    def __init__(self, Kp=0.2, Ki=0.001, Kd=0.001, maxI=0.1, maxOut=3.0):
+    # def __init__(self, Kp=0.2, Ki=0.001, Kd=0.001, maxI=0.1, maxOut=3.0):
+    def __init__(self, Kp=0.025, Ki=0.01, Kd=0.01, maxI=0.1, maxOut=3.0):
         self.Kp = Kp
         self.Ki = Ki
         self.Kd = Kd
