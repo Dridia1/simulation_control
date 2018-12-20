@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# StateMachine class will control all the states and call the do_action
+# States class will control all the states and call the do_action
 
 
 class StateMachine:
