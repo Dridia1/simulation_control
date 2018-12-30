@@ -5,6 +5,8 @@ import rospy
 import actionlib
 from geometry_msgs.msg import Point, PoseStamped
 
+from long_grippers import LongGrippers
+
 import mavros_state
 import time
 from simulation_control.msg import descend_on_objectAction, descend_on_objectGoal, detect_objectAction, \
@@ -25,13 +27,15 @@ class TakeOff(State):
 
     def do_action(self):
         # print("TOstate: Start")
-        cps_vo_2018.goto_position_goal.destination.pose.position.z = 5
-        cps_vo_2018.goto_position_client.send_goal(cps_vo_2018.goto_position_goal)
+        CPSVO2018.goto_position_goal.destination.pose.position.z = 5
+        CPSVO2018.goto_position_client.send_goal(CPSVO2018.goto_position_goal)
         # Will return True or False
-        self.takeoff = cps_vo_2018.goto_position_client.wait_for_result()
+        self.takeoff = CPSVO2018.goto_position_client.wait_for_result()
         # print("TOState succ: " + str(self.takeoff))
         # Close long grippers to pickup position
-        cps_vo_2018.move_long_grippers(0.5000000000)
+        print("Takeoff done, Grippers next, should fail the fuck out of thems")
+        LongGrippers.close_grippers()
+        # cps_vo_2018.grippers_long.move_to_pickup_pos()
         print("TOState: moved long gripp. Done")
 
     def next_state(self):
@@ -341,7 +345,13 @@ class CPSVO2018:
     mv_state = None
 
     local_pose = PoseStamped()  # Local position of the drone
-    # goto_position_goal = goto_positionGoal()
+
+    # Things to consider deleting
+    goto_position_goal = goto_positionGoal()
+    detect_object_goal = detect_objectGoal()
+    goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
+
+    grippers_long = LongGrippers()
 
     def __init__(self):
         # Initialize variables and Take off
@@ -361,26 +371,33 @@ class CPSVO2018:
         # _local_pose_callback called when pose received
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
 
-        self.goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
+        # self.goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
         self.goto_position_client.wait_for_server()
-        self.goto_position_goal = goto_positionGoal()
+        # self.goto_position_goal = goto_positionGoal()
 
         # Init Short grippers
         self.short_grippers_client = actionlib.SimpleActionClient('short_grippers', short_grippersAction)
         self.short_grippers_client.wait_for_server()
 
         # Init Long Grippers
-        self.long_grippers_client = actionlib.SimpleActionClient('long_grippers', long_grippersAction)
-        self.long_grippers_client.wait_for_server()
+        # self.long_grippers_client = actionlib.SimpleActionClient('long_grippers', long_grippersAction)
+        print("Init long grippers")
+        LongGrippers.start_grippers()
+        print("Init done")
+
+        # print("Move long grippers to pickup pos")
+        # self.grippers_long.move_to_pickup_pos()
+        # print("Move is done")
+
 
         # Init Detect Object
         self.detect_object_client = actionlib.SimpleActionClient('detect_object', detect_objectAction)
         self.detect_object_client.wait_for_server()
-        self.detect_object_goal = detect_objectGoal()
+        # self.detect_object_goal = detect_objectGoal()
 
         # Init Center on Object server
-        self.center_on_object_client = actionlib.SimpleActionClient('asd', center_on_objectAction)
-        self.center_on_object_client.wait_for_server()
+        # self.center_on_object_client = actionlib.SimpleActionClient('asd', center_on_objectAction)
+        # self.center_on_object_client.wait_for_server()
 
         # Init Descend on Object server
         self.descend_on_object_client = actionlib.SimpleActionClient('descend_on_object', descend_on_objectAction)
@@ -474,16 +491,6 @@ class CPSVO2018:
         # Commit landing for Drone
         mv_state.land(0.0)
 
-    def move_long_grippers(self, Lpos):
-        rospy.loginfo("Moving long grippers to: " + str(Lpos))
-        long_grippers_goal = long_grippersGoal(grip_rad_goal=Float32(Lpos))
-        self.long_grippers_client.send_goal(long_grippers_goal)
-        self.long_grippers_client.wait_for_result()
-        if self.long_grippers_client.get_result().goal_reached.data:
-            rospy.loginfo("Long grippers moved to position")
-        else:
-            rospy.loginfo("Error with moving long grippers to position")
-
     def move_short_grippers(self, Spos):
         rospy.loginfo("Moving short grippers to: " + str(Spos))
         short_grippers_goal = short_grippersGoal(grip_rad_goal=Float32(Spos))
@@ -500,6 +507,7 @@ class CPSVO2018:
         self.goto_position_goal.destination.pose.position.z = z
         self.goto_position_client.send_goal(self.goto_position_goal)
         self.goto_position_client.wait_for_result()
+
     def get_cam_pos_callback(self, data):
         if data.x != float("inf"):
             self.detected = True
@@ -509,6 +517,7 @@ class CPSVO2018:
 
     def _local_pose_callback(self, data):
         self.local_pose = data
+
 
 
 if __name__ == '__main__':
