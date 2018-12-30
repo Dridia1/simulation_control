@@ -110,9 +110,9 @@ class descend_on_object_server():
     def distance_reached_cb(self, data):
         self.target_reached = data.data
 
+
 if __name__ == '__main__':
     try:
-
         rospy.init_node('descend_on_object_server')
         descend_on_object_server()
     except rospy.ROSInterruptException:

@@ -24,16 +24,18 @@ class center_on_object_server():
         rospy.Subscriber('/position_control/distance', Bool, self.distance_reached_cb)
 
         self.rate = rospy.Rate(20)
-        self.result = simulation_control.msg.descend_on_objectResult()
-        self.action_server = actionlib.SimpleActionServer('descend_on_object',
-                                                          simulation_control.msg.descend_on_objectAction,
+        self.result = simulation_control.msg.center_on_objectResult()
+        self.action_server = actionlib.SimpleActionServer('center_on_object',
+                                                          simulation_control.msg.center_on_objectAction,
                                                           execute_cb=self.execute_cb,
                                                           auto_start=False)
         self.last_object_pose = Point()
+        print("Start center server")
+
         self.action_server.start()
 
     def execute_cb(self, goal):
-        rospy.loginfo("Starting to descend")
+        rospy.loginfo("Starting to center")
         self.mode_control.publish('velctr')
         rospy.sleep(0.1)
 
@@ -51,8 +53,8 @@ class center_on_object_server():
             self.des_pose.pose.position.z = self.local_pose.pose.position.z  # Redundant?
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
+            # while not self.target_reached:
+                # rospy.sleep(2)
 
         '''elif self.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
             self.des_pose.pose.position.x = 0
@@ -76,8 +78,8 @@ class center_on_object_server():
             self.des_pose.pose.position.y = self.object_pose.y
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
+            # while not self.target_reached:
+                # rospy.sleep(2)
 
         '''elif self.detected and abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
             self.des_pose.pose.position.x = 0
