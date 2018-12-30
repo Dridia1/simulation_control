@@ -32,7 +32,16 @@ class LongGrippers:
 
     @classmethod
     def open_grippers(cls):
-        print("open grippers")
+        print("Open grippers...")
+        goalposition = long_grippersGoal(grip_rad_goal=Float32(0.00000000000))
+        cls.long_grippers_client.send_goal(goalposition)
+        s = cls.long_grippers_client.wait_for_result()
+        if s:
+            print("Grippers Closed")
+            return s
+        else:
+            print("Grippers didn't close.")
+            return s
 
     @classmethod
     def close_grippers(cls):
@@ -42,9 +51,20 @@ class LongGrippers:
         s = cls.long_grippers_client.wait_for_result()
         if s:
             print("Grippers Closed")
+            return s
         else:
             print("Grippers didn't close.")
+            return s
 
     @classmethod
     def move_to_pickup_pos(cls):
-        print("grippers set to pickupposition")
+        print("Move Grippers to PickupPos")
+        goalposition = long_grippersGoal(grip_rad_goal=Float32(0.50000000000))
+        cls.long_grippers_client.send_goal(goalposition)
+        s = cls.long_grippers_client.wait_for_result()
+        if s:
+            print("Grippers moved to pickup pos")
+            return s
+        else:
+            print("Grippers didn't move to pickup.")
+            return s

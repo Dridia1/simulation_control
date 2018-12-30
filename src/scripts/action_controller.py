@@ -6,6 +6,7 @@ import actionlib
 from geometry_msgs.msg import Point, PoseStamped
 
 from long_grippers import LongGrippers
+from short_grippers import ShortGrippers
 
 import mavros_state
 import time
@@ -22,21 +23,17 @@ roslib.load_manifest('simulation_control')
 # Possible inputs: Object.Lost, Object.Found, Destination.Reached
 
 # Start
-class TakeOff(State):
+class Start(State):
     takeoff = False
 
     def do_action(self):
-        # print("TOstate: Start")
         CPSVO2018.goto_position_goal.destination.pose.position.z = 5
         CPSVO2018.goto_position_client.send_goal(CPSVO2018.goto_position_goal)
         # Will return True or False
         self.takeoff = CPSVO2018.goto_position_client.wait_for_result()
-        # print("TOState succ: " + str(self.takeoff))
-        # Close long grippers to pickup position
-        print("Takeoff done, Grippers next, should fail the fuck out of thems")
-        LongGrippers.close_grippers()
-        # cps_vo_2018.grippers_long.move_to_pickup_pos()
-        print("TOState: moved long gripp. Done")
+
+        # Move long grippers to pickup position
+        LongGrippers.move_to_pickup_pos()
 
     def next_state(self):
         # if state_input == "":
@@ -54,10 +51,10 @@ class Flying(State):
     Done = False
 
     def do_action(self):
-        if self.Done:
-            cps_vo_2018.mv_state.land(0.0)
+        # if self.Done:
+            # cps_vo_2018.mv_state.land(0.0)
         print("Fstate: Flying to " + str(self.pos[0]) + ", " + str(self.pos[1]) + ", " + str(self.pos[2]))
-        cps_vo_2018.fly_to_pos(self.pos[0], self.pos[1], self.pos[2])
+        CPSVO2018.fly_to_pos(self.pos[0], self.pos[1], self.pos[2])
 
     def next_state(self):
         if self.CheckDroneVisible:
@@ -259,7 +256,7 @@ class Land(State):
         return Drone.Flying  # TAKEOFF FIRST??
 
 
-class ShortGrippers(State):
+class Short_Grippers(State):
     gripperValue = 0
 
     def do_action(self):
@@ -280,7 +277,7 @@ class ShortGrippers(State):
             return Drone.Flying
 
 
-class LongGrippers(State):
+class Long_Grippers(State):
     gripperValue = 0
 
     def do_action(self):
@@ -326,12 +323,12 @@ class Drone(StateMachine):
 
 
 # Initialize the states for the States
-Drone.TakeOff = TakeOff()
+Drone.Start = Start()
 Drone.Searching = Searching()
 Drone.Flying = Flying()
 Drone.Centering = Centering()
-Drone.ShortGrippers = ShortGrippers()
-Drone.LongGrippers = LongGrippers()
+Drone.ShortGrippers = Short_Grippers()
+Drone.LongGrippers = Long_Grippers()
 Drone.Ascend = Ascend()
 Drone.Descend = Descend()
 Drone.DescendOnObject = DescendOnObject()
