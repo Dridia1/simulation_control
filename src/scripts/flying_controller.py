@@ -3,12 +3,26 @@ import actionlib
 from simulation_control.msg import goto_positionAction, goto_positionGoal
 from std_msgs.msg import Float32
 
+import mavros_state
+
 
 class Flying:
     goto_position_client = None
 
+    mv_state = None
+
     @classmethod
     def start_position_server(cls):
+        cls.mv_state = mavros_state.mavros_state()
+        # cls.mv_state = mavros_state.mavros_state()
+        if cls.mv_state is None:
+            print("!!!!!!!!!!!!!!!!!!!!!!MV_STATE DID NOT GET SET!!!!!!!!!!!!!!!!!!!!!!")
+        else:
+            print("MV_STATE got set!! :) ")
+        cls.mv_state.set_mode('OFFBOARD')
+        # rospy.loginfo('Arming vehicle')
+        cls.mv_state.arm(True)
+
         cls.goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
         cls.goto_position_client.wait_for_server()
 
@@ -31,3 +45,6 @@ class Flying:
     @classmethod
     def land_drone(cls):
         print("land")
+        cls.mv_state.arm(False)
+
+
