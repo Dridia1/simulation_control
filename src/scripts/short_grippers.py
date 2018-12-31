@@ -41,7 +41,7 @@ class ShortGrippers:
     @classmethod
     def close_grippers(cls):
         print("Closing grippers...")
-        goalposition = short_grippersGoal(grip_rad_goal=Float32(1.57000000000))
+        goalposition = short_grippersGoal(grip_rad_goal=Float32(1.22000000000))
         cls.short_grippers_client.send_goal(goalposition)
         s = cls.short_grippers_client.wait_for_result()
         if s:
