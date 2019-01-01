@@ -224,23 +224,6 @@ class DescendOnDrone(State):
         else:
             print("Descending didn't succeed")
 
-        '''if cps_vo_2018.local_pose.pose.position.z > 1.0:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = cps_vo_2018.local_pose.pose.position.z - 0.9
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
-            while not self.target_reached:
-                rospy.sleep(2)
-
-        if 1.0 > cps_vo_2018.local_pose.pose.position.z > 0.1:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = cps_vo_2018.local_pose.pose.position.z - 0.1
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
-            while not self.target_reached:
-                rospy.sleep(2)'''
         # descendOnObjectGoal = descend_on_objectGoal()
         # #descend_on_objectGoal.height = 2.0
         # descend_on_object_client.send_goal(descendOnObjectGoal)
@@ -248,20 +231,23 @@ class DescendOnDrone(State):
 
     def next_state(self):
         # Add '''cps_vo_2018.detected and''' to all if statements
-        # if cps_vo_2018.detected:
+        if self.detected:
             if self.local_pose.pose.position.z > 1.0:
                 if abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2:
                     return Drone.Centering
                 elif abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
                     return Drone.DescendOnDrone
-            if 1.0 > self.local_pose.pose.position.z > 0.1:
+            elif 1.0 > self.local_pose.pose.position.z > 0.1:
                 if abs(self.object_pose.x > 0.05 or abs(self.object_pose.y) > 0.05):
                     return Drone.Centering
                 elif abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
                     return Drone.DescendOnDrone
-            return Drone.Land
-        # else:
-            # Drone.Flying.pos = [-105, 0, 3]
+            else:
+                print("Return Laaaand")
+                return Drone.Land
+        else:
+            print("Return FlyToS")
+            return Drone.FlyToS
             # return Drone.Flying  # TAKEOFF?
 
         # #if below height z, return Open grippers. above height y descend.
@@ -335,7 +321,8 @@ class Land(State):
         # Drone.Flying.pos = [-105, 0, 3]
         else:
             print("Drone is not visible, take off!")
-            return Drone.Start  # TAKEOFF FIRST??
+            Flying.ascend_to_z(1)
+            return Drone.Search  # TAKEOFF FIRST??
 
     def get_cam_pos_callback(self, data):
         if data.x != float("inf"):
@@ -418,13 +405,14 @@ Drone.FlyToDrone = FlyToDrone()
 Drone.Search = Search()
 Drone.Centering = Centering()
 Drone.Short_Grippers = Short_Grippers()
+Drone.Land = Land()
 
 Drone.LongGrippers = Long_Grippers()
 Drone.Ascend = Ascend()
 Drone.Descend = Descend()
 Drone.DescendOnObject = DescendOnObject()
 Drone.DescendOnDrone = DescendOnDrone()  # Duplicate?
-Drone.Land = Land()
+
 drone_done = False
 
 
