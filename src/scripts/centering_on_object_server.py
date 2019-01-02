@@ -53,16 +53,16 @@ class center_on_object_server():
             self.des_pose.pose.position.z = self.local_pose.pose.position.z  # Redundant?
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Large-Centering...")
-            # while not self.target_reached:
-                # rospy.sleep(2)
+            while not self.target_reached:
+                rospy.sleep(2)
         elif self.detected and (abs(self.object_pose.x) > 0.05 or abs(self.object_pose.y) > 0.05):
             self.last_object_pose = self.object_pose
             self.des_pose.pose.position.x = self.object_pose.x
             self.des_pose.pose.position.y = self.object_pose.y
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Small-Centering...")
-            # while not self.target_reached:
-                # rospy.sleep(2)
+            while not self.target_reached:
+                rospy.sleep(2)
 
         '''elif self.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
             self.des_pose.pose.position.x = 0
@@ -108,6 +108,7 @@ class center_on_object_server():
         self.local_pose = data
 
     def distance_reached_cb(self, data):
+        # print("Distance reached!!" + str(data.data))
         self.target_reached = data.data
 
 
