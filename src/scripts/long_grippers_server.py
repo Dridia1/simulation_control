@@ -8,13 +8,14 @@ import time
 
 from std_msgs.msg import Float32
 
+
 class long_grippers_server():
     def __init__(self):
 
-        #variables
+        # variables
         self.target_pos = Float32()
 
-        #publishers
+        # publishers
         self.grip_control = rospy.Publisher('/f550_amazing/longgrip_rad', Float32, queue_size=1)
 
         self.rate = rospy.Rate(20)
@@ -25,7 +26,7 @@ class long_grippers_server():
                                                     auto_start=False)
         self.server.start()
 
-	# Main function
+    # Main function
     def execute_cb(self, goal):
         self.grip_control.publish(goal.grip_rad_goal)
         time.sleep(3)

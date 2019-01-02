@@ -50,7 +50,7 @@ class LongGrippers:
         cls.long_grippers_client.send_goal(goalposition)
         s = cls.long_grippers_client.wait_for_result()
         if s:
-            print("Grippers Closed")
+            print("Grippers Closed all the way")
             return s
         else:
             print("Grippers didn't close.")
