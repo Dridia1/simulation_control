@@ -3,8 +3,11 @@ import rospy
 import actionlib
 import simulation_control.msg
 from std_msgs.msg import Bool, String
+from flying_controller import Flying
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
+
+
 class goto_position_server():
     def __init__(self):
 
@@ -30,15 +33,32 @@ class goto_position_server():
         self.pose_control.publish(goal.destination)
         rospy.sleep(0.1)
         print(self.target_reached)
-        while not self.target_reached:
-            self.rate.sleep()
+        if Flying.CheckForDrone:
+            while not self.target_reached and self.detected:
+                self.rate.sleep()
+            if not self.target_reached and not self.detected:
+                rospy.loginfo("Drone dropped")
+                self.action_server.set_aborted()
+            rospy.loginfo("Destination reached")
+            self.action_server.set_succeeded()
+        elif not Flying.CheckForDrone:
+            while not self.target_reached:
+                self.rate.sleep()
+            rospy.loginfo("Destination reached")
+            self.action_server.set_succeeded()
 
-        rospy.loginfo("Destination reached")
-        self.action_server.set_succeeded()
 
 
     def distance_reached_cb(self, data):
         self.target_reached = data.data
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+            self.object_pose = data
+        else:
+            self.detected = False
+
 
 if __name__ == '__main__':
     try:

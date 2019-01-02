@@ -8,7 +8,7 @@ import mavros_state
 
 class Flying:
     goto_position_client = None
-
+    CheckForDrone = False
     mv_state = None
 
     @classmethod
