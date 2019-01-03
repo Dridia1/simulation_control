@@ -46,11 +46,12 @@ class center_on_object_server():
         print("z = ", self.local_pose.pose.position.z)
         rospy.sleep(0.2)
 
+        '''
         if self.detected and (abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2):
             self.last_object_pose = self.object_pose
             self.des_pose.pose.position.x = self.object_pose.x
             self.des_pose.pose.position.y = self.object_pose.y
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z  # Redundant?
+            self.des_pose.pose.position.z = self.local_pose.pose.position.z
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Large-Centering...")
             while not self.target_reached:
@@ -59,11 +60,12 @@ class center_on_object_server():
             self.last_object_pose = self.object_pose
             self.des_pose.pose.position.x = self.object_pose.x
             self.des_pose.pose.position.y = self.object_pose.y
+            self.des_pose.pose.position.z = self.local_pose.pose.position.z
             self.vel_control.publish(self.des_pose)
             rospy.loginfo("Small-Centering...")
             while not self.target_reached:
                 rospy.sleep(2)
-
+        '''
         '''elif self.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
             self.des_pose.pose.position.x = 0
             self.des_pose.pose.position.y = 0

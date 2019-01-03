@@ -2,13 +2,14 @@ import rospy
 import actionlib
 from simulation_control.msg import goto_positionAction, goto_positionGoal
 from std_msgs.msg import Float32
+from geometry_msgs.msg import PoseStamped, Point
 
 import mavros_state
 
 
 class Flying:
     goto_position_client = None
-
+    local_pose = PoseStamped()
     mv_state = None
 
     @classmethod
@@ -22,6 +23,8 @@ class Flying:
         cls.mv_state.set_mode('OFFBOARD')
         # rospy.loginfo('Arming vehicle')
         cls.mv_state.arm(True)
+
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, cls._local_pose_callback)
 
         cls.goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
         cls.goto_position_client.wait_for_server()
@@ -47,5 +50,19 @@ class Flying:
         print("land")
         cls.mv_state.arm(False)
 
+    @classmethod
+    def arm_drone(cls):
+        print("armingdrone")
+        cls.mv_state.arm(True)
 
+    @classmethod
+    def ascend_z_by(cls, z, pos):
+        goto_position_goal = goto_positionGoal()
+        goto_position_goal.destination.pose.position.z = pos + z
+        cls.goto_position_client.send_goal(goto_position_goal)
+        return cls.goto_position_client.wait_for_result()
+
+    @classmethod
+    def _local_pose_callback(cls, data):
+        cls.local_pose = data
 
