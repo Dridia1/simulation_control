@@ -114,7 +114,7 @@
         <collision name='world_collision'>
           <geometry>
           	<mesh>
-          	<scale>1 1 1</scale>
+          	<scale>0.5 0.5 0.5</scale>
           		<uri>model://landing_strip/meshes/Timpa.dae</uri>
           	</mesh>
           </geometry>
@@ -124,7 +124,7 @@
 		<cast_shadows>0</cast_shadows>
 			<geometry>
 				<mesh>
-					<scale>1 1 1</scale>
+					<scale>0.5 0.5 0.5</scale>
 					<uri>model://landing_strip/meshes/Timpa.dae</uri>
 				</mesh>
 			</geometry>

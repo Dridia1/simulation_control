@@ -108,6 +108,7 @@ class center_on_object_server():
         self.local_pose = data
 
     def distance_reached_cb(self, data):
+        # print("Distance reached!!" + str(data.data))
         self.target_reached = data.data
 
 
