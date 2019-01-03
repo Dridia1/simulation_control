@@ -261,6 +261,7 @@ class DescendOnDrone(State):
                     return Drone.Centering
                 elif abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
                     return Drone.DescendOnDrone
+
             else:
                 print("return Land")
                 return Drone.Land
