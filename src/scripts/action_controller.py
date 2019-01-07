@@ -10,12 +10,12 @@ from short_grippers import ShortGrippers
 from flying_controller import Flying
 from object_detection import ObjectDetection
 
-import mavros_state
+
 import time
 from simulation_control.msg import descend_on_objectAction, descend_on_objectGoal, detect_objectAction, \
     detect_objectGoal, goto_positionAction, goto_positionGoal, short_grippersAction, short_grippersGoal, \
     long_grippersAction, long_grippersGoal, center_on_objectAction, center_on_objectGoal
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 from State import State
 from StateMachine import StateMachine
 
@@ -27,14 +27,16 @@ roslib.load_manifest('simulation_control')
 # Start
 class Start(State):
     takeoff = False
+    local_pose = PoseStamped()
 
     def do_action(self):
         # CPSVO2018.goto_position_goal.destination.pose.position.z = 5
         # CPSVO2018.goto_position_client.send_goal(CPSVO2018.goto_position_goal)
         # Will return True or False
         # self.takeoff = CPSVO2018.goto_position_client.wait_for_result()
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
 
-        self.takeoff = Flying.ascend_to_z(5)
+        self.takeoff = Flying.ascend_to_z(5, self.local_pose)
 
         # Move long grippers to pickup position
         LongGrippers.move_to_pickup_pos()
@@ -46,6 +48,9 @@ class Start(State):
             return Drone.FlyToS
         else:
             return Drone.Start
+
+    def _local_pose_callback(self, data):
+        self.local_pose = data
 
 
 class FlyToS(State):
@@ -67,45 +72,67 @@ class FlyToDrone(State):
     success = False
 
     def do_action(self):
+        print("FlyToDrone!")
+        # ObjectDetection.detect_object()
         position = ObjectDetection.get_detection_position()
         self.success = Flying.fly_to_position(position.x, position.y, position.z)
 
     def next_state(self):
         if self.success:
-            return Drone.Centering
+            return Drone.DescendOnDrone
         else:
+            rospy.sleep(100)
             return Drone.FlyToDrone
 
 
 class Search(State):
     found = False
 
+    local_pose = PoseStamped()
+
     def do_action(self):
         print("Searching")
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
         ObjectDetection.start_object_detection()
-        self.found = ObjectDetection.detect_object()
+        self.result = ObjectDetection.detect_object()
+        print("search-drone-pos: " + str(ObjectDetection.get_detection_position()))
+        obj = ObjectDetection.get_detection_position()
+        if obj.x is not 0 and obj.y is not 0 and obj.z is not 0:
+            self.found = True
+        print("-------------")
 
     def next_state(self):
         if self.found:
             return Drone.FlyToDrone
         else:
+            Flying.ascend_z_by(0.5, self.local_pose)
             return Drone.Search
+
+    def _local_pose_callback(self, data):
+        self.local_pose = data
 
 
 class Centering(State):
     des_pose = PoseStamped()
-    object_pose = Point()
+
     vel_control = rospy.Publisher('/position_control/set_velocity', PoseStamped, queue_size=10)
 
-    local_pose = PoseStamped()
+
     centering_on_object_client = None
 
     detected = False
 
+    def __init__(self):
+        self.local_pose = PoseStamped()
+        self.object_pose = Point()
+
     def do_action(self):
+
         # subscribers
         rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
         rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+
+        rospy.sleep(2.0)
 
         print("Centering state")
         if self.centering_on_object_client is None:
@@ -124,42 +151,30 @@ class Centering(State):
         else:
             print("Centering didn't succeed")
 
-        '''if self.local_pose.pose.position.z > 1.0:
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
-        if self.local_pose.pose.position.z < 1.0 and self.local_pose.pose.position.z > 0.1:
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
-        '''
 
     def next_state(self):
         # if within x, return descend. If outside, return centering
-        # if cps_vo_2018.detected:
+        if self.detected is True:
             if self.local_pose.pose.position.z > 1.0:
-                if abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2:
+                if abs(self.object_pose.x) > 0.3 or abs(self.object_pose.y) > 0.3:
                     return Drone.Centering
-                elif abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
+                else:  # abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
                     return Drone.DescendOnDrone
-            if 1.0 > self.local_pose.pose.position.z > 0.1:
-                if abs(self.object_pose.x > 0.05 or abs(self.object_pose.y) > 0.05):
+            if 1.0 > self.local_pose.pose.position.z > 0.2:
+                if abs(self.object_pose.x > 0.075 or abs(self.object_pose.y) > 0.075):
                     return Drone.Centering
-                elif abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
+                else:  # abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
                     return Drone.DescendOnDrone
-            return Drone.Land
-        # else:
+            if abs(self.object_pose.x) < 0.075 and abs(self.object_pose.y) < 0.075:
+                return Drone.Land
+            else:
+                return Drone.Centering
+        else:
             # Drone.Flying.pos = [-105, 0, 3]
             # return Drone.Flying
+            print("Return Search after ascend by 0.5")
+            Flying.ascend_z_by(0.5, self.local_pose)
+            return Drone.Search
 
     def _local_pose_callback(self, data):
         self.local_pose = data
@@ -170,28 +185,6 @@ class Centering(State):
             self.object_pose = data
         else:
             self.detected = False
-
-
-class DescendOnObject(State):
-    local_pose = PoseStamped()
-    des_pose = PoseStamped()
-    object_pose = Point()
-    vel_control = rospy.Publisher('/position_control/set_velocity', PoseStamped, queue_size=10)
-
-    def do_action(self):
-        descend_on_object_goal = descend_on_objectGoal()
-        cps_vo_2018.descend_on_object_client.send_goal(descend_on_object_goal)
-        descend_succeeded = cps_vo_2018.descend_on_object_client.wait_for_result()
-
-    def next_state(self):
-        if cps_vo_2018.detected and abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
-            return Drone.DescendOnObject
-        elif cps_vo_2018.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
-            return Drone.DescendOnObject
-        elif cps_vo_2018.detected and (abs(self.object_pose.x) > 0.05 or abs(self.object_pose.y) > 0.05):
-            return Drone.Centering
-        elif cps_vo_2018.detected and (abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2):
-            return Drone.Centering
 
 
 class DescendOnDrone(State):
@@ -229,23 +222,24 @@ class DescendOnDrone(State):
     def next_state(self):
         if self.detected:
             if self.local_pose.pose.position.z > 1.0:
-                if abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2:
-                    return Drone.Centering
-                elif abs(self.object_pose.x) < 0.3 and abs(self.object_pose.y) < 0.3:
+                if abs(self.object_pose.x) < 0.4 and abs(self.object_pose.y) < 0.4:
                     return Drone.DescendOnDrone
-            elif 1.0 > self.local_pose.pose.position.z > 0.1:
-                if abs(self.object_pose.x > 0.05 or abs(self.object_pose.y) > 0.05):
+                else:
                     return Drone.Centering
-                elif abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
+            elif 1.0 > self.local_pose.pose.position.z > 0.2:
+                if abs(self.object_pose.x) < 0.1 and abs(self.object_pose.y) < 0.1:
                     return Drone.DescendOnDrone
-            elif abs(self.object_pose.x) < 0.03 and abs(self.object_pose.y) < 0.03:
+                else:
+                    return Drone.Centering
+            elif abs(self.object_pose.x) < 0.075 and abs(self.object_pose.y) < 0.075:
                 print("Return Laaaand")
                 return Drone.Land
             else:
                 return Drone.Centering
         else:
-            print("Return FlyToS")
-            return Drone.FlyToS
+            print("Return Search")
+            # Flying.ascend_z_by(1, self.local_pose)
+            return Drone.Search
 
     def _local_pose_callback(self, data):
         self.local_pose = data
@@ -257,65 +251,24 @@ class DescendOnDrone(State):
         else:
             self.detected = False
 
-# Regular Descend is fly_to_pos with lower z value.
-class Descend(State):
-    def do_action(self):
-        print("Descending")
-        cps_vo_2018.goto_position_goal.destination.pose.position.z = 0.5
-        cps_vo_2018.goto_position_client.send_goal(cps_vo_2018.goto_position_goal)
-        # Will return True or False
-        self.ascended = cps_vo_2018.goto_position_client.wait_for_result()
-
-    def next_state(self):
-        # if within x and below height y, return land. above height y descend. If outside, return centering
-        if dropOff.dropoff:
-            LongGrippers.gripperValue = 0.000000000
-            return Drone.LongGrippers
-        return Drone.TakeOff
-
 
 class Ascend(State):
+    ascended = False
+    detected = False
     def do_action(self):
         print("Ascending")
-        cps_vo_2018.goto_position_goal.destination.pose.position.z = 5
-        cps_vo_2018.goto_position_client.send_goal(cps_vo_2018.goto_position_goal)
-        # Will return True or False
-        self.ascended = cps_vo_2018.goto_position_client.wait_for_result()
-
-    def next_state(self):
-        if self.ascended:
-            # If Camera sees drone Return Centering else return Ascend
-            return Drone.Ascend
-        else:
-            return Drone.Ascend
-
-
-class Land(State):
-
-    detected = False
-    object_pose = Point()
-
-    def do_action(self):
-        print("Land this bitch and check the camera pos")
         rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
-        Flying.land_drone()
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
         rospy.sleep(2.0)
-        # self.vel_control.publish(self.des_pose)
-        # self.rate.sleep()
-        # self.result.position_reached.data = True
-        # self.action_server.set_succeeded(self.result)
+        # Will return True or False
+        self.ascended = Flying.ascend_z_by(1, self.local_pose)  # MARK: aasdasd
 
     def next_state(self):
-        # Return Close grippers if drone is visible. If not return Takeoff?
-        if self.detected:
-            print("Drone is visible, close grippers")
-            # Drone.ShortGrippers.gripperValue = 1.2200000000
-            return Drone.Short_Grippers
-        # Drone.Flying.pos = [-105, 0, 3]
+        if self.ascended and self.detected:
+            # If Camera sees drone Return Centering else return Ascend
+            return Drone.Search
         else:
-            print("Drone is not visible, take off!")
-            Flying.ascend_to_z(1)
-            return Drone.Search  # TAKEOFF FIRST??
+            return Drone.Ascend
 
     def get_cam_pos_callback(self, data):
         if data.x != float("inf"):
@@ -324,65 +277,265 @@ class Land(State):
         else:
             self.detected = False
 
-class Short_Grippers(State):
-    gripperValue = 0
+    def _local_pose_callback(self, data):
+        self.local_pose = data
 
+
+class Land(State):
+
+    detected = False
+    object_pose = Point()
+    local_pose = PoseStamped()
+    landed = False
+
+    def do_action(self):
+        print("Land this bitch and check the camera pos")
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
+        max_output = rospy.Publisher('/position_control/set_max_pid', Float32, queue_size=10)
+        max_output_data = Float32()
+        max_output_data.data = 0.2
+        rospy.sleep(2.0)
+
+        max_output.publish(max_output_data)
+        # Remove sleep + if-statement if not working
+        print("in land: pos" + str(self.local_pose))
+        if self.local_pose.pose.position.z < 1.0:
+            Flying.land_drone()
+            self.landed = True
+            rospy.sleep(2.0)
+        # self.vel_control.publish(self.des_pose)
+        # self.rate.sleep()
+        # self.result.position_reached.data = True
+        # self.action_server.set_succeeded(self.result)
+
+    def next_state(self):
+        # Return Close grippers if drone is visible. If not return Takeoff?
+        if self.detected and self.landed:
+            print("Drone is visible, close grippers")
+            # Drone.ShortGrippers.gripperValue = 1.2200000000
+            return Drone.Close_Short_Grippers
+        # Drone.Flying.pos = [-105, 0, 3]
+        else:
+            print("Drone is not visible, take off!")
+            if self.landed:
+                Flying.arm_drone()
+                rospy.sleep(3.0)
+
+            Flying.ascend_to_z(1, self.local_pose)
+
+            return Drone.FlyToDrone  # TAKEOFF FIRST??
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+            self.object_pose = data
+        else:
+            self.detected = False
+
+    def _local_pose_callback(self, data):
+        self.local_pose = data
+
+
+class Close_Short_Grippers(State):
+    detected = False
+    object_pose = Point()
     def do_action(self):
         print("CloseShortGrippers")
+
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        rospy.sleep(2.0)
+        print("obj pos: " + str(self.object_pose))
+        rospy.sleep(3)
         ShortGrippers.start_grippers()
         ShortGrippers.close_grippers()
+        Flying.arm_drone()
+        rospy.sleep(2.5)
 
     def next_state(self):
-        # Close grippers
-        if not dropOff.dropoff:
-            LongGrippers.gripperValue = 1.5700000000
-            return Drone.LongGrippers
+        if self.detected:
+            print("Drone visible, ascending")
+
+            return Drone.Ascend_W_Drone
         else:
-            ShortGrippers.gripperValue = 0.000000000
-            dropOff.dropoff = False
-            Drone.Flying.CheckDroneVisible = False
-            Drone.Flying.pos = [0, -105, 5]
-            Flying.Done = True
-            return Drone.Flying
+            print("Drone not visible, going to Ascend")
+            ShortGrippers.open_grippers()
+            return Drone.Ascend
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+            self.object_pose = data
+        else:
+            self.detected = False
 
 
-class Long_Grippers(State):
-    gripperValue = 0
-
-    def do_action(self):
-        if not dropOff.dropoff:
-            time.sleep(3)
-            print('Setting offboard')
-            cps_vo_2018.mv_state.set_mode('OFFBOARD')
-            print('Arming vehicle')
-            cps_vo_2018.mv_state.arm(True)
-            time.sleep(1)
-            rospy.loginfo("Lifting")
-            cps_vo_2018.fly_to_pos(-105, 0, 1.5)
-            time.sleep(1)
-        if cps_vo_2018.detected:
-            cps_vo_2018.move_long_grippers(self.gripperValue)
-            time.sleep(1)
-
-    def next_state(self):
-        if dropOff.dropoff:
-            ShortGrippers.gripperValue = 0.0000000000
-        Drone.Flying.CheckDroneVisible = True
-        Drone.Flying.pos = [-105, 0, 3]
-        return Drone.Flying
-
-
-class dropOff(State):
-    dropoff = True
+class Ascend_W_Drone(State):
+    successAscend = False
+    detected = False
+    local_pose = PoseStamped()
 
     def do_action(self):
-        print("..")
+        print("Ascending to 0.5 m to close Long grippers")
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
+        rospy.sleep(1.0)
+
+        self.successAscend = Flying.ascend_to_z(0.5, self.local_pose)
+        # rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        LongGrippers.close_grippers()  # Move this one
+        Flying.CheckForDrone = True
 
     def next_state(self):
-        if cps_vo_2018.detected:
-            return Drone.Descend
-        Drone.Flying.pos = [-105, 0, 3]
-        return Drone.Flying  # ?????????????????????????????????????????
+        if self.detected and self.successAscend:
+            print("Drone detected")
+            return Drone.Close_Long_Grippers
+        else:
+            print("Drone not detected, going to Ascend")
+            LongGrippers.move_to_pickup_pos()
+            ShortGrippers.open_grippers()
+            Flying.CheckForDrone = False
+            return Drone.Ascend
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+        else:
+            self.detected = False
+
+    def _local_pose_callback(self, data):
+        self.local_pose = data
+
+
+class Close_Long_Grippers(State):
+    detected = False
+
+    def do_action(self):
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        LongGrippers.close_grippers()
+        rospy.sleep(1)
+        print("Long grippers closed")
+
+    def next_state(self):
+        if self.detected:
+            return Drone.FlyToDrop
+        else:
+            Flying.CheckForDrone = False
+            return Drone.Ascend
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+        else:
+            self.detected = False
+
+
+class FlyToDrop(State):
+    pos = [0, 105, 5]
+    success = False
+    detected = False
+
+    def do_action(self):
+        print("Flying to drop position and changing fly mode...")
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        self.set_mode = rospy.Publisher('/position_control/set_fly_mode', String, queue_size=10)
+        rospy.sleep(1.0)
+        self.set_mode.publish("checkdrone")
+        self.success = Flying.fly_to_position(self.pos[0], self.pos[1], self.pos[2])
+        # print("Did flying go well? : " + str(self.success))
+
+    def next_state(self):
+        if self.success and self.detected:
+            print("Drone made it do destination and sees the object")
+            self.set_mode.publish("regular")
+            return Drone.Descend_W_Drone
+        else:
+            print("Dropped the object. Ascending to 3 m and searching, changing fly mode")
+            self.set_mode.publish("regular")
+            LongGrippers.move_to_pickup_pos()
+            ShortGrippers.open_grippers()
+            return Drone.Ascend
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+        else:
+            self.detected = False
+
+
+class Descend_W_Drone(State):
+    detected = False
+    local_pose = PoseStamped()
+
+    def do_action(self):
+        print("Descending")
+        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
+        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
+        rospy.sleep(1)
+        Flying.ascend_to_z(1, self.local_pose)
+        Flying.CheckForDrone = False
+
+    def next_state(self):
+        return Drone.Drop_D
+
+    def get_cam_pos_callback(self, data):
+        if data.x != float("inf"):
+            self.detected = True
+            self.object_pose = data
+        else:
+            self.detected = False
+
+    def _local_pose_callback(self, data):
+        self.local_pose = data
+
+
+class Drop_D(State):
+    longG = False
+    shortG = False
+
+    def do_action(self):
+        print("Opening long and short grippers")
+
+        self.longG = LongGrippers.open_grippers()
+        time.sleep(3)
+        self.shortG = ShortGrippers.open_grippers()
+
+    def next_state(self):
+        if self.shortG and self.longG:
+            return Drone.FlyToEnd
+
+
+class FlyToEnd(State):
+
+    def do_action(self):
+        print("Going Home")
+        Flying.fly_to_position(0, -105, 5)
+
+    def next_state(self):
+        return Drone.End
+
+
+class End(State):
+
+    def do_action(self):
+        print("Landing")
+        Flying.fly_to_position(0, -105, 0.5)
+
+        Flying.land_drone()
+
+    def next_state(self):
+        return Drone.Done
+
+
+class Done(State):
+
+    def do_action(self):
+        print("Done, should only print once")
+        rospy.signal_shutdown("Drone has completed")
+
+    def next_state(self):
+        return Drone.Done
 
 
 class Drone(StateMachine):
@@ -395,16 +548,21 @@ class Drone(StateMachine):
 Drone.Start = Start()
 Drone.FlyToS = FlyToS()
 Drone.FlyToDrone = FlyToDrone()
+Drone.Land = Land()
 Drone.Search = Search()
 Drone.Centering = Centering()
-Drone.Short_Grippers = Short_Grippers()
-Drone.Land = Land()
+Drone.Close_Short_Grippers = Close_Short_Grippers()
+Drone.Ascend_W_Drone = Ascend_W_Drone()
+Drone.FlyToDrop = FlyToDrop()
+Drone.Descend_W_Drone = Descend_W_Drone()
+Drone.Drop_D = Drop_D()
+Drone.FlyToEnd = FlyToEnd()
+Drone.End = End()
+Drone.Done = Done()
 
-Drone.LongGrippers = Long_Grippers()
+Drone.Close_Long_Grippers = Close_Long_Grippers()
 Drone.Ascend = Ascend()
-Drone.Descend = Descend()
-Drone.DescendOnObject = DescendOnObject()
-Drone.DescendOnDrone = DescendOnDrone()  # Duplicate?
+Drone.DescendOnDrone = DescendOnDrone() # Duplicate?
 
 drone_done = False
 
@@ -420,174 +578,29 @@ class CPSVO2018:
     detect_object_goal = detect_objectGoal()
     goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
 
-    grippers_long = LongGrippers()
 
     def __init__(self):
-        # Initialize variables and Take off
-        rospy.init_node('action_controller')
+        # Initialize variables and start some servers
+        rospy.init_node('action_controller')  # Create a Node
         rospy.loginfo('Setting offboard')
-        '''self.mv_state = mavros_state.mavros_state()
-        if self.mv_state is None:
-            print("!!!!!!!!!!!!!!!!!!!!!!MV_STATE DID NOT GET SET!!!!!!!!!!!!!!!!!!!!!!")
-        else:
-            print("MV_STATE got set!! :) ")
-        self.mv_state.set_mode('OFFBOARD')
-        rospy.loginfo('Arming vehicle')
-        self.mv_state.arm(True)'''
-        Flying.start_position_server()
 
-        # get_cam_pos_callback called when cam_point received
-        rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
-        # _local_pose_callback called when pose received
-        rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self._local_pose_callback)
+        Flying.start_position_server()  # Starting position server.
 
-        Flying.start_position_server()
-        # self.goto_position_client = actionlib.SimpleActionClient('goto_position', goto_positionAction)
-        # self.goto_position_client.wait_for_server()
-        # self.goto_position_goal = goto_positionGoal()
 
-        # Init Short grippers
-        # self.short_grippers_client = actionlib.SimpleActionClient('short_grippers', short_grippersAction)
-        # self.short_grippers_client.wait_for_server()
-
-        # Init Long Grippers
-        # self.long_grippers_client = actionlib.SimpleActionClient('long_grippers', long_grippersAction)
-        print("Init long grippers")
+        print("Init long grippers")  # This will start the Longgrippersserver
         LongGrippers.start_grippers()
         print("Init done")
 
-        # print("Move long grippers to pickup pos")
-        # self.grippers_long.move_to_pickup_pos()
-        # print("Move is done")
-
-
-        # Init Detect Object
-        # self.detect_object_client = actionlib.SimpleActionClient('detect_object', detect_objectAction)
-        # self.detect_object_client.wait_for_server()
-        # self.detect_object_goal = detect_objectGoal()
-
-        # Init Center on Object server
-        # self.center_on_object_client = actionlib.SimpleActionClient('asd', center_on_objectAction)
-        # self.center_on_object_client.wait_for_server()
-
-        # Init Descend on Object server
-        # self.descend_on_object_client = actionlib.SimpleActionClient('descend_on_object', descend_on_objectAction)
-        # self.descend_on_object_client.wait_for_server()
 
         # End of Initializing
 
         rospy.loginfo("Taking off")
-        # goto_position_goal.destination.pose.position.z = 5
-        # goto_position_client.send_goal(goto_position_goal)
-        # Will return True or False
-        # s = goto_position_client.wait_for_result()
+
         d = Drone()
         d.start()  # This will perform the TakeOff action.
 
-        while not drone_done:
+        while not rospy.is_shutdown():
             d.do_next_state()
-
-        '''
-        rospy.loginfo("Takeoff succeeded: ")
-
-        fly_to_pos(-105, 0, 3)
-        rospy.loginfo("Arrived at search position.")
-
-        rospy.loginfo("Searching...")
-        detect_object_client.send_goal(detect_object_goal)
-        detect_object_client.wait_for_result()
-        print(detect_object_client.get_result())
-
-        rospy.loginfo("Going to detected position")
-        fly_to_pos(detect_object_client.get_result().detected_position.pose.position.x,
-                   detect_object_client.get_result().detected_position.pose.position.y,
-                   detect_object_client.get_result().detected_position.pose.position.z)
-        rospy.loginfo("Is at position (x,y,z)=({}, {}, {})".format(
-            detect_object_client.get_result().detected_position.pose.position.x,
-            detect_object_client.get_result().detected_position.pose.position.y,
-            detect_object_client.get_result().detected_position.pose.position.z))
-
-        rospy.loginfo("Descending on object")
-        descend_on_object_client = actionlib.SimpleActionClient('descend_on_object', descend_on_objectAction)
-        descend_on_object_client.wait_for_server()
-        rospy.loginfo("Descending server started")
-        descend_on_object_goal = descend_on_objectGoal()
-        descend_on_objectGoal = 2.0
-        descend_on_object_client.send_goal(descend_on_object_goal)
-        descend_on_object_client.wait_for_result()
-        if descend_on_object_client.get_result().position_reached.data:
-            print("landing")
-            mv_state.arm(False)
-        else:
-            rospy.loginfo("Couldnt land, exiting")
-        time.sleep(3)
-
-        # Close Short Grippers
-        move_short_grippers(1.22000000000)
-
-        time.sleep(3)
-        print('Setting offboard')
-        mv_state.set_mode('OFFBOARD')
-        print('Arming vehicle')
-        mv_state.arm(True)
-        time.sleep(1)
-
-        rospy.loginfo("Lifting")
-        fly_to_pos(-105, 0, 1.5)
-        time.sleep(1)
-
-        # Close Long Grippers
-        move_long_grippers(1.57000000000)
-        time.sleep(1)
-
-        rospy.loginfo("Going to drop off position")
-        fly_to_pos(0, 105, 5)
-        time.sleep(3)
-
-        rospy.loginfo("Descending prior to drop off")
-        fly_to_pos(0, 105, 0.5)
-
-        # Open Long Grippers
-        time.sleep(3)
-        move_long_grippers(0.00000000000)
-
-        # Open short Grippers
-        time.sleep(1)
-        move_short_grippers(0.00000000000)
-        time.sleep(3)
-
-        rospy.loginfo("Going Home")
-        fly_to_pos(0, -105, 5)
-        '''
-        # Commit landing for Drone
-        self.mv_state.land(0.0)
-
-    def move_short_grippers(self, Spos):
-        rospy.loginfo("Moving short grippers to: " + str(Spos))
-        short_grippers_goal = short_grippersGoal(grip_rad_goal=Float32(Spos))
-        self.short_grippers_client.send_goal(short_grippers_goal)
-        self.short_grippers_client.wait_for_result()
-        if self.short_grippers_client.get_result().goal_reached.data:
-            rospy.loginfo("Short grippers moved to position")
-        else:
-            rospy.loginfo("Error when moving short grippers")
-
-    def fly_to_pos(self, x, y, z):
-        self.goto_position_goal.destination.pose.position.x = x
-        self.goto_position_goal.destination.pose.position.y = y
-        self.goto_position_goal.destination.pose.position.z = z
-        self.goto_position_client.send_goal(self.goto_position_goal)
-        return self.goto_position_client.wait_for_result()
-
-    def get_cam_pos_callback(self, data):
-        if data.x != float("inf"):
-            self.detected = True
-            self.object_pose = data
-        else:
-            self.detected = False
-
-    def _local_pose_callback(self, data):
-        self.local_pose = data
 
 
 if __name__ == '__main__':

@@ -13,5 +13,6 @@ class StateMachine:
         self.currentState.do_action()
 
     def do_next_state(self):
+        # print("Before trans, state is" + str(self.currentState.__class__.__name__))
         self.currentState = self.currentState.next_state()
         self.currentState.do_action()

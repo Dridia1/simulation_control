@@ -17,6 +17,8 @@ class descend_on_object_server():
         #publishers
         self.mode_control = rospy.Publisher('/position_control/set_mode', String, queue_size=10)
         self.vel_control = rospy.Publisher('/position_control/set_velocity', PoseStamped, queue_size=10)
+        self.pose_control = rospy.Publisher('/position_control/set_position', PoseStamped, queue_size=10)
+
 
         #subscribers
         rospy.Subscriber('/color_detection/cam_point', Point, self.get_cam_pos_callback)
@@ -35,65 +37,47 @@ class descend_on_object_server():
 
     def execute_cb(self, goal):
         rospy.loginfo("Starting to descend")
-        self.mode_control.publish('velctr')
+        # self.mode_control.publish('velctr')
         rospy.sleep(0.1)
 
-    # while self.local_pose.pose.position.z > 1.0:
         self.rate.sleep()
         print("x = ",self.local_pose.pose.position.x)
         print("y = ",self.local_pose.pose.position.y)
         print("z = ",self.local_pose.pose.position.z)
         rospy.sleep(0.2)
 
-
-        '''if self.detected and (abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2):
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Centering...")
+        if self.detected and abs(self.object_pose.x) < 0.1 and abs(self.object_pose.y) < 0.1 and self.local_pose.pose.position.z < 1.5:
+            self.des_pose.pose.position.x = self.local_pose.pose.position.x + self.object_pose.x
+            self.des_pose.pose.position.y = self.local_pose.pose.position.y + self.object_pose.y
+            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.2
+            rospy.loginfo("Descending small...")
+            self.pose_control.publish(self.des_pose)
+            # self.vel_control.publish(self.des_pose)
             while not self.target_reached:
-                rospy.sleep(2)'''
-
-        if self.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.9
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
+                rospy.sleep(1)
+        else:  # self.detected and abs(self.object_pose.x) < 0.4 and abs(self.object_pose.y) < 0.4:
+            self.des_pose.pose.position.x = self.local_pose.pose.position.x + self.object_pose.x
+            self.des_pose.pose.position.y = self.local_pose.pose.position.y + self.object_pose.y
+            if self.local_pose.pose.position.z - 0.6 <= 0:
+                self.des_pose.pose.position.z = 0.05
+            else:
+                self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.6
+            rospy.loginfo("Descending large...")
+            self.pose_control.publish(self.des_pose)
+            # self.vel_control.publish(self.des_pose)
             while not self.target_reached:
-                rospy.sleep(2)
-
-    # while self.local_pose.pose.position.z < 1.0 and self.local_pose.pose.position.z > 0.1:
-        '''self.rate.sleep()
-        print("x = ",self.local_pose.pose.position.x)
-        print("y = ",self.local_pose.pose.position.y)
-        print("z = ",self.local_pose.pose.position.z)
-        rospy.sleep(0.2)'''
-
-        '''if self.detected and (abs(self.object_pose.x) > 0.05 or abs(self.object_pose.y) > 0.05):
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Centering...")
+                rospy.sleep(1)
+        '''else:
+            self.des_pose.pose.position.x = self.local_pose.pose.position.x + self.object_pose.x
+            self.des_pose.pose.position.y = self.local_pose.pose.position.y + self.object_pose.y
+            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.2
+            rospy.loginfo("Descending super small...")
+            self.pose_control.publish(self.des_pose)
+            # self.vel_control.publish(self.des_pose)
             while not self.target_reached:
-                rospy.sleep(2)'''
+                rospy.sleep(1)'''
+        rospy.sleep(2.0)
 
-        if self.detected and abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.1
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
-            while not self.target_reached:
-                rospy.sleep(2)
-
-
-        '''print("Landing")
-        self.vel_control.publish(self.des_pose)
-        self.rate.sleep()'''
         self.result.position_reached.data = True
         self.action_server.set_succeeded(self.result)
 

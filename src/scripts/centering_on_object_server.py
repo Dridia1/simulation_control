@@ -3,7 +3,7 @@ import rospy
 import actionlib
 import simulation_control.msg
 from geometry_msgs.msg import PoseStamped, Point
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float32
 
 
 class center_on_object_server():
@@ -16,6 +16,7 @@ class center_on_object_server():
 
         # publishers
         self.mode_control = rospy.Publisher('/position_control/set_mode', String, queue_size=10)
+        self.pose_control = rospy.Publisher('/position_control/set_position', PoseStamped, queue_size=10)
         self.vel_control = rospy.Publisher('/position_control/set_velocity', PoseStamped, queue_size=10)
 
         # subscribers
@@ -32,64 +33,57 @@ class center_on_object_server():
         self.last_object_pose = Point()
         print("Start center server")
 
+        set_x_pid = rospy.Publisher('/position_control/set_x_pid', Point, queue_size=10)
+        set_y_pid = rospy.Publisher('/position_control/set_y_pid', Point, queue_size=10)
+        set_z_pid = rospy.Publisher('/position_control/set_z_pid', Point, queue_size=10)
+
+        # Used for reference, remove when done!
+        # self.vController.set_x_pid(2.8, 0.913921, 0.0, self.max_output)
+        # self.vController.set_y_pid(2.8, 0.913921, 0.0, self.max_output)  # 2.1, 0.713921, 0.350178
+        # self.vController.set_z_pid(1.3, 2.4893, 0.102084, 0.1)
+
+        # rospy.sleep(2.0)
+
+        XnY = Point()
+        Z = Point()
+
+        XnY.x = 2.8
+        XnY.y = 0.95
+        XnY.z = 0.0
+
+        Z.x = 1.1
+        Z.y = 2.6
+        Z.z = 0.122084
+
+        # set_x_pid.publish(XnY)
+        # set_y_pid.publish(XnY)
+
+
+        rospy.sleep(1.0)
+
         self.action_server.start()
 
     def execute_cb(self, goal):
-        rospy.loginfo("Starting to center")
-        self.mode_control.publish('velctr')
-        rospy.sleep(0.1)
+        rospy.loginfo("Waiting to stabilize...")
+        # self.mode_control.publish('velctr')
+        rospy.sleep(5)
+        rospy.loginfo("Now centering...")
 
     # while self.local_pose.pose.position.z > 1.0:
         self.rate.sleep()
         print("x = ", self.local_pose.pose.position.x)
         print("y = ", self.local_pose.pose.position.y)
         print("z = ", self.local_pose.pose.position.z)
-        rospy.sleep(0.2)
 
-        if self.detected and (abs(self.object_pose.x) > 0.2 or abs(self.object_pose.y) > 0.2):
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z  # Redundant?
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Large-Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
-        elif self.detected and (abs(self.object_pose.x) > 0.05 or abs(self.object_pose.y) > 0.05):
-            self.last_object_pose = self.object_pose
-            self.des_pose.pose.position.x = self.object_pose.x
-            self.des_pose.pose.position.y = self.object_pose.y
-            self.vel_control.publish(self.des_pose)
-            rospy.loginfo("Small-Centering...")
-            while not self.target_reached:
-                rospy.sleep(2)
-
-        '''elif self.detected and abs(self.object_pose.x) < 0.2 and abs(self.object_pose.y) < 0.2:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.9
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
-            while not self.target_reached:
-                rospy.sleep(2)'''
-
-    # while 1.0 > self.local_pose.pose.position.z > 0.1:
-        '''self.rate.sleep()
-        print("x = ", self.local_pose.pose.position.x)
-        print("y = ", self.local_pose.pose.position.y)
-        print("z = ", self.local_pose.pose.position.z)
-        rospy.sleep(0.2)'''
-
-
-
-        '''elif self.detected and abs(self.object_pose.x) < 0.05 and abs(self.object_pose.y) < 0.05:
-            self.des_pose.pose.position.x = 0
-            self.des_pose.pose.position.y = 0
-            self.des_pose.pose.position.z = self.local_pose.pose.position.z - 0.1
-            rospy.loginfo("Descending...")
-            self.vel_control.publish(self.des_pose)
-            while not self.target_reached:
-                rospy.sleep(2)'''
+        self.last_object_pose = self.object_pose
+        self.des_pose.pose.position.x = self.local_pose.pose.position.x + self.object_pose.x
+        self.des_pose.pose.position.y = self.local_pose.pose.position.y + self.object_pose.y
+        self.des_pose.pose.position.z = self.local_pose.pose.position.z
+        self.pose_control.publish(self.des_pose)
+        # self.vel_control.publish(self.des_pose)
+        rospy.loginfo("Only-Centering..." + str(self.object_pose))
+        while not self.target_reached:
+            rospy.sleep(1)
 
         print("Centering Done!")
         self.vel_control.publish(self.des_pose)

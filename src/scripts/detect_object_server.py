@@ -25,13 +25,25 @@ class detect_object_server():
 
 
     def execute_cb(self, goal):
-        rospy.sleep(0.1)
-        while not self.detected:
-            self.rate.sleep()
+        rospy.loginfo("Waiting to stabilize...")
+        rospy.sleep(5.0)
+        rospy.loginfo("Now searching...")
 
-        rospy.loginfo("Target Detected")
-        self.result.detected_position = self.local_pose
-        self.action_server.set_succeeded(self.result)
+        now = rospy.get_rostime()
+        last_req = rospy.get_rostime()
+        while not self.detected and (last_req - now) < rospy.Duration(5):
+            self.rate.sleep()
+            last_req = rospy.get_rostime()
+
+        if self.detected:
+            rospy.loginfo("Target Detected")
+            self.result.detected_position = self.local_pose
+            self.action_server.set_succeeded(self.result)
+        else:
+            rospy.loginfo("Target not Detected")
+            self.action_server.set_aborted()
+
+
 
 
     def get_cam_pos_callback(self, data):

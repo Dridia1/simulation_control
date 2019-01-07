@@ -15,6 +15,7 @@ class position_control():
         rospy.Subscriber('/position_control/set_mode', String, self.set_mode_callback)
         rospy.Subscriber('/position_control/set_position', PoseStamped, self.set_pose_callback)
         rospy.Subscriber('/position_control/set_velocity', PoseStamped, self.set_velocity_callback)
+        rospy.Subscriber('/position_control/set_max_pid', Float32, self.set_max_pid_output)
 
         rospy.Subscriber('/position_control/set_x_pid', Point, self.set_x_pid)
         rospy.Subscriber('/position_control/set_y_pid', Point, self.set_y_pid)
@@ -44,9 +45,11 @@ class position_control():
         self.current_mode = String()
         self.current_mode.data = 'posctr'
 
+        self.max_output = 0.15
+
         self.vController = VelocityController()
-        self.vController.set_x_pid(2.8, 0.913921, 0.0, 0.15)
-        self.vController.set_y_pid(2.8, 0.913921, 0.0, 0.15)#2.1, 0.713921, 0.350178
+        self.vController.set_x_pid(2.8, 0.913921, 0.0, self.max_output)
+        self.vController.set_y_pid(2.8, 0.913921, 0.0, self.max_output)  # 2.1, 0.713921, 0.350178
         self.vController.set_z_pid(1.3, 2.4893, 0.102084, 0.1)
 
         print('Init done')
@@ -104,13 +107,17 @@ class position_control():
         self.set_vel_pose(data)
 
     def set_x_pid(self,data):
-        self.vController.set_x_pid(data.x, data.y, data.z)
+        self.vController.set_x_pid(data.x, data.y, data.z, self.max_output)
 
     def set_y_pid(self,data):
-        self.vController.set_y_pid(data.x, data.y, data.z)
+        self.vController.set_y_pid(data.x, data.y, data.z, self.max_output)
 
     def set_z_pid(self,data):
-        self.vController.set_z_pid(data.x, data.y, data.z)
+        self.vController.set_z_pid(data.x, data.y, data.z, 0.1)
+
+    def set_max_pid_output(self, data):
+        print("New Max Output Value : " + str(data.data))
+        self.max_output = data.data
 
     def check_distance(self):
         if self.current_mode.data == 'posctr':
@@ -139,6 +146,7 @@ class position_control():
 
     def hover_velocity(self):
         return self.local_velocity.twist.linear.x < 0.2 and self.local_velocity.twist.linear.y < 0.2 and self.local_velocity.twist.linear.z < 0.2
+
 
 if __name__ == '__main__':
     try:
